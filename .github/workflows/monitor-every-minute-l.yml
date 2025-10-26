@@ -1,0 +1,21 @@
+name: Monitor Every Minute L
+
+on:
+  schedule:
+    - cron: '55,56,57,58,59 * * * *'  # Minutes 55,56,57,58,59 of every hour
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python discord_monitor.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_ACTIONS: 'true'

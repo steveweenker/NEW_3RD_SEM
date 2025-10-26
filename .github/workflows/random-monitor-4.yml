@@ -1,0 +1,81 @@
+name: Random Monitor 4
+
+on:
+  schedule:
+    - cron: '* * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Randomized monitor loop
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_ACTIONS: 'true'
+          WORKER_ID: 'R4'
+        run: |
+          python << 'PYTHON_SCRIPT'
+          import asyncio
+          import os
+          import random
+          import time
+          import aiohttp
+          from datetime import datetime
+          
+          URL = "https://results.beup.ac.in/BTech5thSem2024_B2022Results.aspx"
+          WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL")
+          WORKER = os.getenv("WORKER_ID", "R?")
+          
+          async def send_message(session, content):
+              if not WEBHOOK:
+                  return
+              try:
+                  payload = {"content": content, "username": f"Random {WORKER}"}
+                  async with session.post(WEBHOOK, json=payload, timeout=5) as resp:
+                      pass
+              except Exception as e:
+                  pass
+          
+          async def run_once():
+              # Random initial delay 0-15s so each minute they scatter differently
+              await asyncio.sleep(random.uniform(0, 15))
+              end = time.time() + 55
+              last = None
+              
+              async with aiohttp.ClientSession() as session:
+                  while time.time() < end:
+                      t0 = time.time()
+                      status = "DOWN"
+                      
+                      try:
+                          async with session.get(URL, timeout=aiohttp.ClientTimeout(total=4)) as r:
+                              status = "UP" if r.status == 200 else "DOWN"
+                      except asyncio.TimeoutError:
+                          status = "TIMEOUT"
+                      except Exception:
+                          status = "ERROR"
+                      
+                      # Only message on changes or every ~20s to avoid rate limits
+                      if status != last or random.random() < 0.05:
+                          ts = datetime.now().strftime("%H:%M:%S")
+                          emoji = "🎉" if status == "UP" else ("⏱️" if status == "TIMEOUT" else "🔴")
+                          await send_message(session, f"{emoji}[{WORKER}] {status} [{ts}]")
+                      
+                      last = status
+                      
+                      # Random jitter 3-9s between probes
+                      wait = random.uniform(3, 9)
+                      to_sleep = max(0, min(wait, end - time.time()))
+                      if to_sleep <= 0:
+                          break
+                      await asyncio.sleep(to_sleep)
+          
+          asyncio.run(run_once())
+          PYTHON_SCRIPT
