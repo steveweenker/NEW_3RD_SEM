@@ -3,6 +3,7 @@ import os
 import time
 import aiohttp
 import zipfile
+import pytz
 from io import BytesIO
 from datetime import datetime
 from typing import Optional, List
@@ -345,6 +346,13 @@ class DiscordMonitor:
         self.last_scheduled_time: float = 0
         self.rate_limit_remaining = 5
         self.rate_limit_reset = 0
+        self.ist_timezone = pytz.timezone('Asia/Kolkata')
+
+    def get_indian_time(self) -> str:
+        """Get current Indian time in IST timezone using pytz"""
+        utc_now = datetime.now(pytz.utc)
+        ist_now = utc_now.astimezone(self.ist_timezone)
+        return ist_now.strftime("%d-%m-%Y %I:%M:%S %p IST")
 
     async def send_discord_message(self, content: str, username: str = "BEUP Monitor") -> bool:
         if not DISCORD_WEBHOOK_URL:
@@ -405,7 +413,8 @@ class DiscordMonitor:
                     except Exception:
                         pass
                     if idx % 10 == 0 or idx == len(RESULT_URLS):
-                        await self.send_discord_message(f"🔄 Downloaded & added to ZIP: {idx}/{len(RESULT_URLS)}")
+                        current_time = self.get_indian_time()
+                        await self.send_discord_message(f"🔄 Downloaded & added to ZIP: {idx}/{len(RESULT_URLS)} - {current_time}")
         buffer.seek(0)
         return buffer
 
@@ -413,11 +422,13 @@ class DiscordMonitor:
         end = time.time() + CONTINUOUS_DURATION
         while time.time() < end:
             left = int(end - time.time())
-            await self.send_discord_message(f"✅ Website still UP ({left}s left)")
+            current_time = self.get_indian_time()
+            await self.send_discord_message(f"✅ Website still UP ({left}s left) - {current_time}")
             await asyncio.sleep(CHECK_INTERVAL)
 
     async def run(self):
-        await self.send_discord_message("🔍 Monitoring started")
+        start_time = self.get_indian_time()
+        await self.send_discord_message(f"🔍 Monitoring started at {start_time}")
         while True:
             current = await self.check_site()
             now = time.time()
@@ -425,11 +436,14 @@ class DiscordMonitor:
             scheduled_due = (now - self.last_scheduled_time) >= SCHEDULED_INTERVAL
 
             if changed:
+                current_time = self.get_indian_time()
                 if current == "UP":
-                    await self.send_discord_message("🎉 WEBSITE IS NOW LIVE! Starting download…")
+                    await self.send_discord_message(f"🎉 WEBSITE IS NOW LIVE! - {current_time}")
+                    await self.send_discord_message("Starting download…")
                     zip_data = await self.download_and_zip()
                     if await self.send_file("results.zip", zip_data):
-                        await self.send_discord_message(f"📥 Uploaded all {len(RESULT_URLS)} results as ZIP")
+                        upload_time = self.get_indian_time()
+                        await self.send_discord_message(f"📥 Uploaded all {len(RESULT_URLS)} results as ZIP - {upload_time}")
                     else:
                         await self.send_discord_message("⚠️ ZIP upload failed; sending individual files")
                         async with aiohttp.ClientSession() as session:
@@ -443,20 +457,24 @@ class DiscordMonitor:
                                 except:
                                     pass
                                 if idx % 10 == 0 or idx == len(RESULT_URLS):
-                                    await self.send_discord_message(f"🔄 Fallback uploaded {idx}/{len(RESULT_URLS)}")
-                        await self.send_discord_message("📥 Individual files uploaded")
+                                    current_time = self.get_indian_time()
+                                    await self.send_discord_message(f"🔄 Fallback uploaded {idx}/{len(RESULT_URLS)} - {current_time}")
+                        upload_time = self.get_indian_time()
+                        await self.send_discord_message(f"📥 Individual files uploaded - {upload_time}")
                     self.last_scheduled_time = now
                     await self.continuous_status()
                     # At end of continuous, send immediate scheduled update
-                    await self.send_discord_message("📅 Scheduled update: Website is UP")
+                    end_time = self.get_indian_time()
+                    await self.send_discord_message(f"📅 Scheduled update: Website is UP - {end_time}")
                     self.last_scheduled_time = time.time()
                 else:
-                    await self.send_discord_message("🔴 WEBSITE IS DOWN")
+                    await self.send_discord_message(f"🔴 WEBSITE IS DOWN - {current_time}")
                     self.last_scheduled_time = now
 
             elif scheduled_due:
+                current_time = self.get_indian_time()
                 emoji = "✅" if current == "UP" else "🔴"
-                await self.send_discord_message(f"{emoji} Scheduled update: Website is {current}")
+                await self.send_discord_message(f"{emoji} Scheduled update: Website is {current} - {current_time}")
                 self.last_scheduled_time = now
 
             self.last_status = current
@@ -468,7 +486,8 @@ async def main():
         await monitor.run()
     except Exception as e:
         import traceback
-        print("❌ Exception in monitor:", e)
+        error_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%d-%m-%Y %I:%M:%S %p IST")
+        print(f"❌ Exception in monitor at {error_time}:", e)
         traceback.print_exc()
         raise
 
