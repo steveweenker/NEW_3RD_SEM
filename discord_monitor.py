@@ -8,11 +8,11 @@ from datetime import datetime
 from typing import Optional, List
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-URL = "https://results.beup.ac.in/BTech4thSem2024_B2022Results.aspx"
+URL = "https://results.beup.ac.in/BTech3rdSem2024_B2023Results.aspx"
 
 CHECK_INTERVAL = 2
 CONTINUOUS_DURATION = 900
-SCHEDULED_INTERVAL = 7200
+SCHEDULED_INTERVAL = 5
 
 RESULT_URLS = [
     "https://results.beup.ac.in/ResultsBTech3rdSem2024_B2022Pub.aspx?Sem=III&RegNo=22156148040",
